@@ -6,6 +6,14 @@ Hosts are added, checked, and deleted from the same popup, so you never have to 
 
 ![sshpick floating over a Rex window](demo/sshpick.png)
 
+## Why this exists
+
+This is a small personal project. I wanted fast SSH access from Rex while its Linux server is still in beta.
+
+For your own Linux machines, Rex's remote hosts will be the better option: run the Rex server on the machine, and the Mac app connects to it directly. Sessions live on that machine and survive disconnects, and splits, tabs, and the `rex` CLI all work there. Once that's generally available and supports SSH keys (planned), use it wherever you can.
+
+sshpick covers the rest: machines that won't run a Rex server, such as appliances like a NAS or Home Assistant, short-lived cloud VMs, and servers you don't control. For those, a plain `ssh` tab is still the right tool, and sshpick makes getting to one faster.
+
 ## What it does
 
 - **Opens as a floating popup** over your current Rex tab, with no new tab or split.
