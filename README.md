@@ -4,7 +4,7 @@ A floating SSH host picker for [Rex](https://www.superlogical.com/rex). Press a 
 
 Hosts are added, checked, and deleted from the same popup, so you never have to edit `~/.ssh/config` by hand.
 
-![sshpick demo](demo/sshpick.gif)
+![sshpick floating over a Rex window](demo/sshpick.png)
 
 ## What it does
 
@@ -40,6 +40,8 @@ Hosts are added, checked, and deleted from the same popup, so you never have to 
 ## Use
 
 Press **⌘⇧S**, or type `sshpick` in any Rex terminal.
+
+![sshpick demo: searching, adding, and deleting hosts](demo/sshpick.gif)
 
 | Key | Action |
 | --- | --- |
