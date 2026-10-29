@@ -4,7 +4,7 @@ A floating SSH host picker for [Rex](https://www.superlogical.com/rex). Press a 
 
 Hosts are added, checked, and deleted from the same popup, so you never have to edit `~/.ssh/config` by hand.
 
-![sshpick floating over a Rex window](demo/sshpick.png)
+![sshpick demo: searching, adding, and deleting hosts](demo/sshpick.gif)
 
 ## Why this exists
 
@@ -45,11 +45,13 @@ sshpick covers the rest: machines that won't run a Rex server, such as appliance
 
 3. Turn on **Remote Control** in **Rex Settings › Rex Server**. sshpick needs it to switch you to the new session after you connect. Without it the connection still opens, but you have to switch to it yourself.
 
+Once it's set up, **⌘⇧S** opens sshpick as a popup over whatever you're working on, and it closes as soon as you connect:
+
+![sshpick floating over a Rex window](demo/sshpick.png)
+
 ## Use
 
 Press **⌘⇧S**, or type `sshpick` in any Rex terminal.
-
-![sshpick demo: searching, adding, and deleting hosts](demo/sshpick.gif)
 
 | Key | Action |
 | --- | --- |
