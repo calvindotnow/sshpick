@@ -28,9 +28,7 @@ Hosts are added, checked, and deleted from the same popup, so you never have to 
 1. Put the script on your `PATH`:
 
    ```sh
-   mkdir -p ~/.local/bin
-   curl -fsSL https://raw.githubusercontent.com/<you>/sshpick/main/sshpick -o ~/.local/bin/sshpick
-   chmod +x ~/.local/bin/sshpick
+   curl -fsSL --create-dirs -o ~/.local/bin/sshpick https://raw.githubusercontent.com/calvindotnow/sshpick/main/sshpick && chmod +x ~/.local/bin/sshpick
    ```
 
    Make sure `~/.local/bin` is on your `PATH`.
