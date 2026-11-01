@@ -4,6 +4,8 @@
 
 CONFIG=${SSHPICK_CONFIG:-$HOME/.ssh/config}
 BOUNDS=${SSHPICK_BOUNDS:-0.15,0.12,0.7,0.7}  # popup x,y,w,h as fractions of the window
+STATE=${SSHPICK_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/sshpick}  # favorites, recent, sort
+TAB=$(printf '\t')
 REX=$(command -v rex || echo "$HOME/.local/bin/rex")
 JQ=$(command -v jq || echo /usr/bin/jq)
 SELF=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
@@ -45,16 +47,52 @@ list_hosts() {
     awk 'tolower($1)=="host" {for (i=2; i<=NF; i++) if ($i !~ /[*?!]/) print $i}' "$@" 2>/dev/null | sort -u
 }
 
-list_rows() {  # alias<TAB>tag<TAB>display, optionally filtered by tag
-    filter=$1
-    printf '+add\t-\t\033[32m+ add new host\033[0m\n'
+sort_mode() { m=$(cat "$STATE/sort" 2>/dev/null); echo "${m:-recent}"; }
+
+list_label() {  # list_label <filter>
+    printf ' Hosts: %s · %s ' "${1:-all}" "$(sort_mode | sed 's/alpha/A–Z/')"
+}
+
+list_rows() {  # alias<TAB>tag<TAB>display: favorites first, then by last connect or A–Z
+    filter=$(cat "$RUN/filter" 2>/dev/null)
+    if [ "$(sort_mode)" = alpha ]; then keys="-k1,1n -k3,3"; else keys="-k1,1n -k2,2nr -k3,3"; fi
     list_hosts | while read -r h; do
         set -- $(ssh -G "$h" 2>/dev/null | awk '
             $1=="tag"{t=$2} $1=="user"{u=$2} $1=="hostname"{n=$2}
             END {print (t ? t : "ssh"), u, n}')
         case "$filter" in ""|all|"$1") ;; *) continue ;; esac
-        printf '%s\t%s\t%-18s \033[36m%-10s\033[0m \033[2m%s@%s\033[0m\n' "$h" "$1" "$h" "$1" "$2" "$3"
+        fav=1; grep -qxF -- "$h" "$STATE/favorites" 2>/dev/null && fav=0
+        last=$(awk -F'\t' -v h="$h" '$2 == h {print $1}' "$STATE/recent" 2>/dev/null)
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$fav" "${last:-0}" "$h" "$1" "$2" "$3"
+    done | sort -t "$TAB" $keys | while IFS="$TAB" read -r fav _ h tag u n; do
+        if [ "$fav" = 0 ]; then star='\033[33m★\033[0m'; else star=' '; fi
+        printf "%s\t%s\t$star %-18s \033[36m%-10s\033[0m \033[2m%s@%s\033[0m\n" "$h" "$tag" "$h" "$tag" "$u" "$n"
     done
+    printf '+add\t-\t  \033[32m+ add new host\033[0m\n'
+}
+
+toggle_favorite() {
+    [ "$1" = "+add" ] && return
+    mkdir -p "$STATE" && touch "$STATE/favorites"
+    if grep -qxF -- "$1" "$STATE/favorites"; then
+        grep -vxF -- "$1" "$STATE/favorites" > "$STATE/favorites.tmp"
+    else
+        { cat "$STATE/favorites"; echo "$1"; } > "$STATE/favorites.tmp"
+    fi
+    mv "$STATE/favorites.tmp" "$STATE/favorites"
+}
+
+forget() {  # forget <alias> [keep-favorite]: drop it from recent (and favorites)
+    [ -d "$STATE" ] || return 0
+    awk -F'\t' -v h="$1" '$2 != h' "$STATE/recent" > "$STATE/recent.tmp" 2>/dev/null
+    mv "$STATE/recent.tmp" "$STATE/recent"
+    [ -n "$2" ] || { grep -vxF -- "$1" "$STATE/favorites" > "$STATE/favorites.tmp" 2>/dev/null
+                     mv "$STATE/favorites.tmp" "$STATE/favorites"; }
+}
+
+touch_recent() {
+    mkdir -p "$STATE" && forget "$1" keep-favorite
+    printf '%s\t%s\n' "$(date +%s)" "$1" >> "$STATE/recent"
 }
 
 info() {
@@ -85,6 +123,7 @@ delete_host() {
             }
         }
         !skip' "$CONFIG.bak" > "$CONFIG"
+    forget "$1"
 }
 
 # The add/edit form is one fzf instance: enter/shift-tab run `sshpick --form-*`,
@@ -239,7 +278,13 @@ add_host() {  # 0 = connect to $host, 1 = back to the picker
 }
 
 case "$1" in
-    --rows)         list_rows "$2"; exit ;;
+    --rows)         list_rows; exit ;;
+    --fav)          toggle_favorite "$2"; exit ;;
+    --filter)       echo "$2" > "$RUN/filter"
+                    echo "change-list-label($(list_label "$2"))+reload($SELF --rows)"; exit ;;
+    --sort)         if [ "$(sort_mode)" = alpha ]; then m=recent; else m=alpha; fi
+                    mkdir -p "$STATE" && echo "$m" > "$STATE/sort"
+                    echo "change-list-label($(list_label "$(cat "$RUN/filter")"))+reload($SELF --rows)"; exit ;;
     --info)         info "$2"; exit ;;
     --delete)       delete_host "$2"; exit ;;
     --form-summary) form_summary; exit ;;
@@ -250,22 +295,31 @@ case "$1" in
     *)              need; open_popup && exit 0 ;;
 esac
 
+RUN=$(mktemp -d) && export RUN
+trap 'rm -rf "$RUN"' EXIT
+
 while :; do
+    echo all > "$RUN/filter"
     rows=$(list_rows)
     tags=$(printf '%s\n' "$rows" | cut -f2 | grep -vx -- - | sort -u | tr '\n' ' ')
     sel=$(printf '%s\n' "$rows" | fzf --ansi --style=full --layout=reverse --border=rounded \
-        --delimiter='\t' --with-nth=3 \
-        --border-label=' sshpick · enter connect · ^n new · ^d delete · esc quit ' \
-        --input-label=' Search ' --list-label=' Hosts: all ' \
+        --delimiter='\t' --with-nth=3 --id-nth=1 --track --tiebreak=index \
+        --border-label=' sshpick ' \
+        --footer='⏎ connect  ^f fav  ^o sort  ^n new  ^d delete' \
+        --input-label=' Search ' --list-label="$(list_label all)" \
         --header="all $tags" --header-label=' Tags (click) ' \
         --preview="$SELF --info {1}" --preview-window='right,35%' --preview-label=' Details ' \
-        --bind 'click-header:transform:echo "reload($SELF --rows $FZF_CLICK_HEADER_WORD)+change-list-label( Hosts: $FZF_CLICK_HEADER_WORD )"' \
-        --bind 'ctrl-d:execute($SELF --delete {1})+reload($SELF --rows)+change-list-label( Hosts: all )' \
+        --bind 'click-header:transform($SELF --filter $FZF_CLICK_HEADER_WORD)' \
+        --bind 'ctrl-f:execute-silent($SELF --fav {1})+reload($SELF --rows)' \
+        --bind 'ctrl-o:transform($SELF --sort)' \
+        --bind 'ctrl-d:execute($SELF --delete {1})+reload($SELF --rows)' \
         --bind 'ctrl-n:become(printf "+add\n")') || exit 0
     host=$(printf '%s\n' "$sel" | cut -f1)
     [ "$host" = "+add" ] || break
     add_host && break
 done
+
+touch_recent "$host"
 
 session=$(ssh -G "$host" 2>/dev/null | awk '$1=="tag" {print $2; exit}')
 session=${session:-ssh}

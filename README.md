@@ -19,6 +19,7 @@ sshpick covers the rest: machines that won't run a Rex server, such as appliance
 - **Opens as a floating popup** over your current Rex tab, with no new tab or split.
 - **Reads your existing `~/.ssh/config`** (and `~/.ssh/config.d/*`). There's no separate host database.
 - **Fuzzy search** across every host, with a details pane for the highlighted one.
+- **Favorites and recents.** Star the hosts you use most and they stay at the top. Everything is sorted by when you last connected, or A–Z if you prefer.
 - **Tags group your hosts.** Click a tag to filter the list. Each tag is also a Rex session: connecting to a `homelab` host opens a tab in your `homelab` session and creates the session if needed. Untagged hosts go to a session named `ssh`.
 - **Names each tab after the host alias.**
 - **Add a host** with a step-by-step form (alias, hostname, user, port, tag, key). sshpick writes it to your config, then checks that the port is open and that key login works. If key login fails, it offers to run `ssh-copy-id` for you.
@@ -57,6 +58,8 @@ Press **⌘⇧S**, or type `sshpick` in any Rex terminal.
 | --- | --- |
 | type | fuzzy search hosts |
 | `enter` | connect to the highlighted host |
+| `ctrl-f` | favorite or unfavorite the highlighted host |
+| `ctrl-o` | switch the sort between most recent and A–Z |
 | `ctrl-n` | add a new host |
 | `ctrl-d` | delete the highlighted host |
 | click a tag | filter by tag (`all` to reset) |
@@ -74,6 +77,8 @@ Host media
     User root
     Tag homelab
 ```
+
+Favorites, connection history, and your sort choice are saved in `~/.local/state/sshpick/`.
 
 ### Options
 
