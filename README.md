@@ -1,10 +1,8 @@
 # sshpick
 
-A floating SSH host picker for [Rex](https://www.superlogical.com/rex). Press a key, choose a host from your `~/.ssh/config`, and land in a new tab named after that host, grouped into a Rex session by tag.
+A floating SSH host picker for [Rex](https://www.superlogical.com/rex). Press a key, pick a host from your `~/.ssh/config`, and land in a tab named after it, grouped into a Rex session by tag. It also works as a plain picker in any terminal.
 
-Hosts are added, checked, and deleted from the same popup, so you never have to edit `~/.ssh/config` by hand.
-
-![sshpick demo: searching, adding, and deleting hosts](demo/sshpick.gif)
+![sshpick demo](demo/sshpick.gif)
 
 ## Why this exists
 
@@ -14,23 +12,39 @@ For your own Linux machines, Rex's remote hosts will be the better option: run t
 
 sshpick covers the rest: machines that won't run a Rex server, such as appliances like a NAS or Home Assistant, short-lived cloud VMs, and servers you don't control. For those, a plain `ssh` tab is still the right tool, and sshpick makes getting to one faster.
 
-## What it does
+## Features
 
-- **Opens as a floating popup** over your current Rex tab, with no new tab or split.
-- **Reads your existing `~/.ssh/config`** (and `~/.ssh/config.d/*`). There's no separate host database.
-- **Fuzzy search** across every host, with a details pane for the highlighted one.
-- **Favorites and recents.** Star the hosts you use most and they stay at the top. Everything is sorted by when you last connected, or A–Z if you prefer.
-- **Tags group your hosts.** Click a tag to filter the list. Each tag is also a Rex session: connecting to a `homelab` host opens a tab in your `homelab` session and creates the session if needed. Untagged hosts go to a session named `ssh`.
-- **Names each tab after the host alias.**
-- **Add a host** with a step-by-step form (alias, hostname, user, port, tag, key). sshpick writes it to your config, then checks that the port is open and that key login works. If key login fails, it offers to run `ssh-copy-id` for you.
-- **Delete a host** with `ctrl-d`. Your config is backed up to `~/.ssh/config.bak` first.
+**Finding hosts**
+
+- **Uses your existing SSH config.** Hosts come from `~/.ssh/config` and any files it pulls in with `Include`. There's no separate host database.
+- **Fuzzy search** across names, tags, users, and addresses, with a details pane for the highlighted host.
+- **Favorites.** Star a host with `ctrl-f` and it stays at the top.
+- **Recent first.** Hosts are sorted by when you last connected. Press `ctrl-o` to switch to A–Z; sshpick remembers your choice.
+- **Tags.** Add a `Tag` to a host to group it. Press `tab` and `shift-tab` (or click a tag) to filter the list.
+
+**Connecting in Rex**
+
+- **Opens as a floating popup** over whatever you're working on, and closes when you connect.
+- **One session per tag, one tab per host.** Connecting to a `homelab` host opens a tab named after it in your `homelab` session, creating the session if needed. Untagged hosts go to a session named `ssh`.
+- **Jumps to open tabs.** If a host already has a tab, Enter switches to it instead of opening a duplicate. `alt-enter` opens another tab anyway. The details pane shows when a host is open or disconnected.
+- **Reconnects.** If a connection drops, the tab stays open with "r reconnect · any other key closes". Logging out normally just closes the tab.
+
+**Managing hosts**
+
+- **Add** a host with `ctrl-n`: a step-by-step form for the alias, hostname, user, port, tag, and key. sshpick writes it to your config, checks that the port is open and that key login works, and offers to run `ssh-copy-id` if it doesn't.
+- **Edit** a host with `ctrl-e`. This works for hosts sshpick added, which it marks with an `# added by sshpick` comment. Hosts you wrote yourself are left alone.
+- **Delete** a host with `ctrl-d`. Your config is backed up to `~/.ssh/config.bak` first. Hosts from `Include`d files have to be removed in their own file, and sshpick tells you which one.
+
+**Without Rex**
+
+- Outside Rex, or with `sshpick --inline`, sshpick opens below your prompt and runs `ssh` in the same terminal. Everything under "Finding hosts" and "Managing hosts" works the same way. It only needs fzf.
 
 ## Requirements
 
-- **macOS** with **Rex** installed
+- **macOS**
 - **fzf 0.65 or newer**: `brew install fzf`
-- **jq**: preinstalled on recent macOS, or `brew install jq`
 - **OpenSSH 9.4 or newer**, for the `Tag` keyword. Recent macOS already has it; check with `ssh -V`.
+- For the Rex features: **Rex**, and **jq** (preinstalled on recent macOS, or `brew install jq`)
 
 ## Install
 
@@ -40,36 +54,40 @@ sshpick covers the rest: machines that won't run a Rex server, such as appliance
    curl -fsSL --create-dirs -o ~/.local/bin/sshpick https://raw.githubusercontent.com/calvindotnow/sshpick/main/sshpick && chmod +x ~/.local/bin/sshpick
    ```
 
-   Make sure `~/.local/bin` is on your `PATH`.
+   Make sure `~/.local/bin` is on your `PATH`. Without Rex, you're done.
 
-2. Add a keyboard shortcut (optional, but recommended). Paste the contents of [`sshpick.lua`](sshpick.lua) into `~/.config/rex/init.lua`, then reload your Rex config. This binds **⌘⇧S** and adds **SSH: Pick Host** to the command palette.
+2. Add a keyboard shortcut in Rex (optional, but recommended). Paste the contents of [`sshpick.lua`](sshpick.lua) into `~/.config/rex/init.lua`, then reload your Rex config. This binds **⌘⇧S** and adds **SSH: Pick Host** to the command palette.
 
-3. Turn on **Remote Control** in **Rex Settings › Rex Server**. sshpick needs it to switch you to the new session after you connect. Without it the connection still opens, but you have to switch to it yourself.
+3. Turn on **Remote Control** in **Rex Settings › Rex Server**. sshpick needs it to switch you to the host's session. Without it the connection still opens, but you have to switch to it yourself.
 
-Once it's set up, **⌘⇧S** opens sshpick as a popup over whatever you're working on, and it closes as soon as you connect:
+To update later, run `sshpick --update`.
+
+Once it's set up, **⌘⇧S** opens sshpick as a popup over whatever you're working on:
 
 ![sshpick floating over a Rex window](demo/sshpick.png)
 
 ## Use
 
-Press **⌘⇧S**, or type `sshpick` in any Rex terminal.
+Press **⌘⇧S** in Rex, or type `sshpick` in any terminal.
 
 | Key | Action |
 | --- | --- |
 | type | fuzzy search hosts |
-| `enter` | connect to the highlighted host |
+| `enter` | connect, or jump to the host's tab if it's already open |
+| `alt-enter` | open a new tab even if one is already open (Rex) |
+| `tab` / `shift-tab` | next or previous tag (`all` shows everything) |
 | `ctrl-f` | favorite or unfavorite the highlighted host |
 | `ctrl-o` | switch the sort between most recent and A–Z |
-| `ctrl-n` | add a new host |
+| `ctrl-n` | add a host |
+| `ctrl-e` | edit the highlighted host (hosts added by sshpick) |
 | `ctrl-d` | delete the highlighted host |
-| click a tag | filter by tag (`all` to reset) |
 | `esc` | close the picker |
 
-In the add-host form, `enter` moves to the next field and `shift-tab` goes back. After the last field, sshpick saves the host and checks the connection.
+In the add and edit form, `enter` moves to the next field and `shift-tab` goes back. After the last field, sshpick saves the host and checks the connection.
 
 ### Tagging hosts
 
-Put a `Tag` line on any host in `~/.ssh/config` (or fill in the Tag field when you add a host):
+Put a `Tag` line on any host in `~/.ssh/config`, or fill in the Tag field when you add a host:
 
 ```sshconfig
 Host media
@@ -78,27 +96,27 @@ Host media
     Tag homelab
 ```
 
-Favorites, connection history, and your sort choice are saved in `~/.local/state/sshpick/`.
-
 ### Options
 
-- `sshpick --here` runs the picker in the current terminal instead of a popup.
-- `SSHPICK_CONFIG=/path/to/ssh_config` uses that file instead of `~/.ssh/config`, both for listing hosts and for connecting.
-- `SSHPICK_BOUNDS="0.2,0.15,0.6,0.6"` sets the popup's position and size as x, y, width, and height, each a fraction of the window. For the ⌘⇧S shortcut, change `bounds` in `init.lua` instead.
+| Option | What it does |
+| --- | --- |
+| `sshpick --here` | run the Rex picker in the current pane instead of a popup |
+| `sshpick --inline` | use the plain picker, even inside Rex |
+| `sshpick --version` | print the version |
+| `sshpick --update` | update to the latest version from GitHub |
+| `SSHPICK_CONFIG=/path/to/ssh_config` | use that file instead of `~/.ssh/config` |
+| `SSHPICK_BOUNDS="0.2,0.15,0.6,0.6"` | the popup's position and size: x, y, width, height as fractions of the window. For ⌘⇧S, change `bounds` in `init.lua` instead. |
 
-## Re-recording the demo
-
-The GIF is generated with [VHS](https://github.com/charmbracelet/vhs) from [`demo/demo.tape`](demo/demo.tape), using the made-up hosts in [`demo/hosts.conf`](demo/hosts.conf). From the repo root:
-
-```sh
-vhs demo/demo.tape
-```
+Favorites, connection history, and your sort choice are saved in `~/.local/state/sshpick/`.
 
 ## Notes and limitations
 
-- Delete only removes hosts from `~/.ssh/config`, not from files in `~/.ssh/config.d/`.
 - Hosts with wildcards (`Host *`, `Host *.internal`) are skipped, since you can't connect to them directly.
+- A host's tab counts as open until you close it, including while it's showing the reconnect prompt.
+- The connection check when adding a host uses macOS's `nc`, so sshpick is macOS-only for now.
 - Rex is new and its API may change. If something breaks after a Rex update, please open an issue.
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 ## License
 

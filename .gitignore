@@ -1,3 +1,5 @@
 demo/ssh_config
 demo/ssh_config.bak
 .DS_Store
+demo/state/
+demo/sshpick.mp4
