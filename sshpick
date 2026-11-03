@@ -2,7 +2,7 @@
 # sshpick: a floating SSH host picker for Rex, backed by ~/.ssh/config.
 # https://github.com/calvindotnow/sshpick
 
-VERSION=0.2.0
+VERSION=0.2.1
 RAW_URL=https://raw.githubusercontent.com/calvindotnow/sshpick/main/sshpick
 CONFIG=${SSHPICK_CONFIG:-$HOME/.ssh/config}
 case "$CONFIG" in /*) ;; *) CONFIG=$PWD/$CONFIG ;; esac
