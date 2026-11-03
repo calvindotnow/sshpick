@@ -31,7 +31,7 @@ sshpick covers the rest: machines that won't run a Rex server, such as appliance
 
 **Managing hosts**
 
-- **Add** a host with `ctrl-n`: a step-by-step form for the alias, hostname, user, port, tag, and key. sshpick writes it to your config, checks that the port is open and that key login works, and offers to run `ssh-copy-id` if it doesn't.
+- **Add** a host with `ctrl-n`: a step-by-step form for the alias, IP address, user, port, tag, and key. The tag step lists your existing tags to pick from. sshpick writes it to your config, checks that the port is open and that key login works, and offers to run `ssh-copy-id` if it doesn't.
 - **Edit** a host with `ctrl-e`. This works for hosts sshpick added, which it marks with an `# added by sshpick` comment. Hosts you wrote yourself are left alone.
 - **Delete** a host with `ctrl-d`. Your config is backed up to `~/.ssh/config.bak` first. Hosts from `Include`d files have to be removed in their own file, and sshpick tells you which one.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Adding a host: the tag step lists your existing tags to pick from with ↑↓, or type a new one.
+- Adding a host: the hostname field is now labeled "IP address (or domain name)".
+- Adding a host: the user field starts empty instead of your local username. Leave it blank to use ssh's default.
+
 ## 0.2.0
 
 - Favorites (`ctrl-f`) stay at the top of the list.

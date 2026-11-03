@@ -293,12 +293,12 @@ delete_host() {
 
 # The add/edit form is one fzf instance: enter/shift-tab run `sshpick --form-*`,
 # which validates, saves the field to $FORM_DIR/<n>, and tells fzf what to show next.
-FIELD_NAMES="Alias HostName User Port Tag IdentityFile"
+FIELD_NAMES="Alias Address User Port Tag IdentityFile"
 
 field_label() {
     case "$1" in
-        0) echo "Alias" ;;            1) echo "HostName (IP or domain)" ;;
-        2) echo "User" ;;             3) echo "Port" ;;
+        0) echo "Alias" ;;            1) echo "IP address (or domain name)" ;;
+        2) echo "User (blank = ssh default)" ;; 3) echo "Port" ;;
         4) echo "Tag / Rex session (blank = ssh)" ;;
         5) echo "IdentityFile (blank = default)" ;;
     esac
@@ -313,15 +313,45 @@ form_summary() {
     done
 }
 
+TAG_NONE="(no tag · uses ssh)"
+TAG_NEW="  (new tag)"
+
+form_tags() {  # form_tags <query>: the existing tags matching it, plus a row that creates it
+    tags=$(tr ' ' '\n' < "$RUN/tags" | grep -vx -e all -e ssh -e '')
+    if [ -z "$1" ]; then
+        echo "$TAG_NONE"; [ -n "$tags" ] && printf '%s\n' "$tags"; return
+    fi
+    printf '%s\n' "$tags" | grep -qxF -- "$1" || echo "$1$TAG_NEW"  # first, so enter keeps what was typed
+    [ -n "$tags" ] && printf '%s\n' "$tags" | grep -iF -- "$1"
+    return 0
+}
+
 form_goto() {  # print the fzf actions that show field $1 (6 = submit)
     [ "$1" -ge 6 ] && { echo accept; return; }
     echo "$1" > "$FORM_DIR/step"
-    printf 'change-input-label( %s )+change-header()+reload(%s --form-summary)+change-query:%s\n' \
+    if [ "$1" -eq 4 ]; then  # tag step: list the existing tags to pick from
+        printf 'change-input-label( %s )+change-list-label( Tags )+change-header(%s)+reload-sync(%s --form-tags)+first+change-query:%s\n' \
+            "$(field_label 4)" "↑↓ pick an existing tag, or type a new one · hosts with the same tag share a Rex session" \
+            "$SELF" "$(cat "$FORM_DIR/4")"
+        return
+    fi
+    printf 'change-input-label( %s )+change-list-label( Host )+change-header()+reload(%s --form-summary)+change-query:%s\n' \
         "$(field_label "$1")" "$SELF" "$(cat "$FORM_DIR/$1")"
 }
 
-form_next() {  # form_next <query>: validate and save the current field, then advance
+form_on_tags() {  # form_on_tags <action> <fallback>: run the action only on the tag step
+    if [ "$(cat "$FORM_DIR/step")" -eq 4 ]; then echo "$1"; else echo "$2"; fi
+}
+
+form_next() {  # form_next <query> <highlighted row>: validate and save the current field, then advance
     step=$(cat "$FORM_DIR/step") v=$1 err=
+    if [ "$step" -eq 4 ] && [ -n "$2" ]; then  # the highlighted tag row wins over what was typed
+        case "$2" in
+            "$TAG_NONE")  v= ;;
+            *"$TAG_NEW")  v=${2%"$TAG_NEW"} ;;
+            *)            v=$2 ;;
+        esac
+    fi
     case $step in
         0) case "$v" in
                "")            err="Alias is required" ;;
@@ -329,9 +359,9 @@ form_next() {  # form_next <query>: validate and save the current field, then ad
                "$(cat "$FORM_DIR/orig")") ;;
                *) list_hosts | grep -qxF -- "$v" && err="'$v' already exists" ;;
            esac ;;
-        1) [ -n "$v" ] || err="HostName is required" ;;
-        2) v=${v:-$USER} ;;
+        1) [ -n "$v" ] || err="IP address is required" ;;
         3) v=${v:-22}; case "$v" in *[!0-9]*) err="Port must be a number" ;; esac ;;
+        4) case "$v" in *[[:space:]]*) err="No spaces allowed" ;; esac ;;
     esac
     [ -n "$err" ] && { echo "change-header:! $err"; return; }
     printf '%s' "$v" > "$FORM_DIR/$step"
@@ -357,9 +387,12 @@ form() {  # form <title>: edits alias..key in place, 1 = cancelled (values untou
         --disabled --no-sort --info=hidden --pointer=' ' --query "$alias" \
         --border-label=" $1 " --input-label=" Alias " --list-label=' Host ' \
         --footer='enter next · shift-tab back · esc cancel' \
-        --bind "enter:transform($SELF --form-next {q})" \
+        --bind "enter:transform($SELF --form-next {q} {})" \
         --bind "btab:transform($SELF --form-prev {q})" \
-        --bind 'up:ignore,down:ignore,tab:ignore' >/dev/null
+        --bind "change:transform($SELF --form-on-change)" \
+        --bind "up:transform($SELF --form-on-tags up ignore)" \
+        --bind "down:transform($SELF --form-on-tags down ignore)" \
+        --bind 'tab:ignore' >/dev/null
     rc=$?
     if [ $rc -eq 0 ]; then
         alias=$(cat "$FORM_DIR/0") hostname=$(cat "$FORM_DIR/1") user=$(cat "$FORM_DIR/2")
@@ -388,7 +421,8 @@ truncate_config() {  # drop everything after line $lines_before
 write_block() {  # (re)write this host's block at the end of the config
     truncate_config
     {
-        printf '\n%s\nHost %s\n    HostName %s\n    User %s\n' "$MARK" "$alias" "$hostname" "$user"
+        printf '\n%s\nHost %s\n    HostName %s\n' "$MARK" "$alias" "$hostname"
+        [ -n "$user" ]    && echo "    User $user"
         [ "$port" != 22 ] && echo "    Port $port"
         [ -n "$tag" ]     && echo "    Tag $tag"
         [ -n "$key" ]     && printf '    IdentityFile %s\n    IdentitiesOnly yes\n' "$key"
@@ -422,7 +456,7 @@ host_flow() {  # host_flow [alias]: add a host, or edit one sshpick added; 0 = c
     if [ -n "$old" ]; then
         read_block "$old"; title="Edit host"; undo="Undo changes"
     else
-        alias= hostname= user=$USER port=22 tag= key=; title="Add host"; undo=Remove
+        alias= hostname= user= port=22 tag= key=; title="Add host"; undo=Remove
     fi
     form "$title" || return 1
 
@@ -494,7 +528,11 @@ case "$1" in
     --info)         info "$2"; exit ;;
     --delete)       delete_host "$2"; exit ;;
     --form-summary) form_summary; exit ;;
-    --form-next)    form_next "$2"; exit ;;
+    --form-next)    form_next "$2" "$3"; exit ;;
+    --form-tags)    form_tags "$(cat "$FORM_DIR/4")"; exit ;;
+    --form-tags-q)  form_tags "$2"; exit ;;
+    --form-on-tags) form_on_tags "$2" "$3"; exit ;;
+    --form-on-change) form_on_tags "reload-sync($SELF --form-tags-q {q})+first" ignore; exit ;;
     --form-prev)    form_prev "$2"; exit ;;
     --session)      ssh_session "$2" ;;
     --version)      echo "sshpick $VERSION"; exit ;;
